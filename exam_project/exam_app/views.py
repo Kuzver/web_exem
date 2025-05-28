@@ -1,8 +1,16 @@
 from django.shortcuts import render
 
 from django.shortcuts import render
-from .models import ipexam
+from .models import vkexam
 
-def ipexam_list(request):
-    exams = ipexam.objects.filter(is_public=True)
-    return render(request, 'exam_app/ipexam_list.html', {'exams': exams})
+from django.shortcuts import render
+from .models import vkexam
+
+def vkexam_list(request):
+    exams = vkexam.objects.filter(is_public=True)
+    context = {
+        'exams': exams,
+        'full_name': 'Кузнецова Вера Владиславовна',
+        'group_number': 'Группа 241-671',
+    }
+    return render(request, 'exam_app/vkexam_list.html', context)
