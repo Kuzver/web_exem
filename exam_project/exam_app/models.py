@@ -1,0 +1,15 @@
+from django.db import models
+
+from django.db import models
+from django.contrib.auth.models import User
+
+class ipexam(models.Model):
+    title = models.CharField("Название экзамена", max_length=255)
+    created_at = models.DateTimeField("Дата создания", auto_now_add=True)
+    exam_date = models.DateField("Дата проведения экзамена")
+    image = models.ImageField("Задание (изображение)", upload_to='exam_images/')
+    participants = models.ManyToManyField(User, verbose_name="Участники")
+    is_public = models.BooleanField("Публичный экзамен", default=False)
+
+    def __str__(self):
+        return self.title

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Экзамены</title>
+</head>
+<body>
+    <h1>Кузнецова Вера 241-671</h1>
+
+    {% for exam in exams %}
+        <div style="border:1px solid #ccc; margin-bottom:10px; padding:10px;">
+            <h3>{{ exam.title }}</h3>
+            <p><strong>Дата создания:</strong> {{ exam.created_at }}</p>
+            <p><strong>Дата экзамена:</strong> {{ exam.exam_date }}</p>
+            <p><strong>Публичный:</strong> {{ exam.is_public }}</p>
+            <p><strong>Участники:</strong>
+                {% for user in exam.participants.all %}
+                    {{ user.username }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+            {% if exam.image %}
+                <img src="{{ exam.image.url }}" width="200" />
+            {% endif %}
+        </div>
+    {% endfor %}
+</body>
+</html>
