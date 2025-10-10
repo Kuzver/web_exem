@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-re8r&&@#fm^j_lm-8xxy&p=9a+m+fvu%#%e6$30-l6n#3fc)jx
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.40']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -135,3 +135,7 @@ AUTH_USER_MODEL = 'taskapp.TaskMakerUser'
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Используем Redis как брокер сообщений
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CSRF_TRUSTED_ORIGINS = [
+    "https://taskmaster.loca.lt",
+]
+

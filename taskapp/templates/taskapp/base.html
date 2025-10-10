@@ -96,16 +96,20 @@
             <h1><a href="/" style="color: inherit; text-decoration: none;">TaskMaster</a></h1>
             <nav class="nav-links">
                 <a href="{% url 'home' %}">Главная</a>
-                <a href="{% url 'task_list' user.id %}">Задачи</a>
+                {% if user.is_authenticated %}
+    <a href="{% url 'task_list' user.id %}">Задачи</a>
+{% else %}
+    <a href="{% url 'home' %}">Войти</a>
+{% endif %}
                 <a href="javascript:void(0);" id="openProjectsModal">Проекты</a> <!-- Кнопка открытия модалки -->
                 <div class="profile-dropdown">
     <a href="javascript:void(0)">Профиль ▾</a>
     <div class="profile-dropdown-content">
         {% if user.is_authenticated %}
-            <p><strong>Создано задач:</strong> {{ user.created_tasks.count }}</p>
+            <p><strong>Задачи:</strong> {{ user.created_tasks.count }}</p>
         {% else %}
             <p>Вы не вошли</p>
-            <a href="{% url 'taskapp/home' %}">Войти</a>
+            <a href="{% url 'home' %}">Войти</a>
         {% endif %}
     </div>
 </div>

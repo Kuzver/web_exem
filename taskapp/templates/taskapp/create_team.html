@@ -1,48 +1,9 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Создание команды - TaskMaster</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'styles.css' %}">
-    <style>
-        .form-container {
-            width: 400px;
-            margin: 50px auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background: #f9f9f9;
-        }
-        .form-container h2 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .form-container input, .form-container textarea, .form-container button {
-            width: 100%;
-            margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-        .form-container button {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .form-container button:hover {
-            background: #45a049;
-        }
-        .form-container ul {
-            list-style: none;
-            padding-left: 0;
-            color: red;
-        }
-    </style>
-</head>
-<body>
+{% extends 'taskapp/base.html' %}
+{% load static %}
 
+{% block title %}Создание команды - TaskMaster{% endblock %}
+
+{% block content %}
 <div class="form-container">
     <h2>Создать новый проект</h2>
     <form method="post">
@@ -61,19 +22,70 @@
 
         <button type="submit">Создать проект</button>
     </form>
-
-    {% if messages %}
-        <ul>
-            {% for message in messages %}
-                {% if message != "проект успешно создан" %}
-                    <li>{{ message }}</li>
-                {% endif %}
-            {% endfor %}
-        </ul>
-    {% endif %}
 </div>
+{% endblock %}
 
+{% block extra_styles %}
+<style>
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+    }
 
-</body>
-</html>
+    .form-container {
+        width: 400px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #f9f9f9;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-container h2 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .form-container input,
+    .form-container textarea,
+    .form-container button,
+    .form-container select {
+        width: 100%;
+        margin-bottom: 15px;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+
+    .form-container button {
+        background: #D9D9D9;
+        color: black;
+        border: none;
+        cursor: pointer;
+    }
+
+    .form-container button:hover {
+        background: #bcbcbc;
+        color: white;
+    }
+
+    .form-container ul {
+        list-style: none;
+        padding-left: 0;
+        color: white;
+    }
+
+    .form-container p.help-text {
+        font-size: 0.9em;
+        color: #555;
+        margin-top: -10px;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
 

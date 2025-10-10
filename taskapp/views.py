@@ -96,6 +96,7 @@ from .models import Task
 from rest_framework.permissions import BasePermission
 from .models import ProjectMember
 from rest_framework import permissions
+from django.core.exceptions import PermissionDenied
 
 User = get_user_model()
 @require_POST
@@ -124,7 +125,6 @@ def add_project_member(request):
         return JsonResponse({'status': 'error', 'message': 'Project not found'}, status=404)
 
 @login_required
-@require_http_methods(["GET"])
 def api_tasks_by_month(request):
     try:
         year = int(request.GET.get('year'))
@@ -133,8 +133,8 @@ def api_tasks_by_month(request):
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid year or month'}, status=400)
 
-    _, last_day = calendar.monthrange(year, month)
     start_date = date(year, month, 1)
+    last_day = monthrange(year, month)[1]
     end_date = date(year, month, last_day)
 
     tasks = Task.objects.filter(task_should_done_date__range=(start_date, end_date))
@@ -145,6 +145,7 @@ def api_tasks_by_month(request):
         except Project.DoesNotExist:
             return JsonResponse({'error': 'Project not found'}, status=404)
 
+        # Проверяем роль пользователя в проекте
         is_admin = ProjectMember.objects.filter(
             project=project,
             user=request.user,
@@ -155,8 +156,8 @@ def api_tasks_by_month(request):
             tasks = tasks.filter(project=project)
         else:
             tasks = tasks.filter(project=project, task_implementer=request.user)
-
     else:
+        # Если проект не указан, показываем личные задачи пользователя
         tasks = tasks.filter(creator=request.user, task_mode='Личный')
 
     data = [task.to_dict() for task in tasks]
@@ -214,7 +215,7 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('task_list')
+            return redirect('task_list', user_id=request.user.id)
     else:
         form = RegisterForm()
     return render(request, 'taskapp/register.html', {'form': form})
@@ -283,26 +284,69 @@ logger = logging.getLogger(__name__)
 
 
 # Ajax список задач по календарю
+from django.db.models import Q
+from calendar import Calendar
+from django.http import JsonResponse
+from datetime import date
+from .models import Task, Project, ProjectMember
+
 @login_required
 def task_list_ajax(request):
-    year = int(request.GET.get("year"))
-    month = int(request.GET.get("month"))
-    cal = calendar.Calendar(firstweekday=0)
+    try:
+        year = int(request.GET.get("year"))
+        month = int(request.GET.get("month"))
+        project_id = request.GET.get("project_id")
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid parameters'}, status=400)
+
+    cal = Calendar(firstweekday=0)
     month_days = cal.monthdayscalendar(year, month)
 
     calendar_data = []
+
+    # Определяем дату начала и конца месяца
+    start_date = date(year, month, 1)
+    from calendar import monthrange
+    last_day = monthrange(year, month)[1]
+    end_date = date(year, month, last_day)
+
+    # Получаем задачи за месяц
+    tasks = Task.objects.filter(task_should_done_date__range=(start_date, end_date))
+
+    if project_id:
+        try:
+            project = Project.objects.get(id=project_id)
+        except Project.DoesNotExist:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+
+        is_admin = ProjectMember.objects.filter(
+            project=project,
+            user=request.user,
+            project_role__iexact='Администратор'
+        ).exists()
+
+        if is_admin:
+            tasks = tasks.filter(project=project)
+        else:
+            tasks = tasks.filter(
+                project=project
+            ).filter(
+                Q(task_implementer=request.user) | Q(creator=request.user)
+            )
+    else:
+        tasks = tasks.filter(creator=request.user, task_mode='Личный')
+
+    # Формируем данные по дням
     for week in month_days:
         week_data = []
         for day in week:
             if day == 0:
                 week_data.append({'day': 0, 'tasks': []})
             else:
-                tasks = Task.objects.filter(task_should_done_date__year=year,
-                                            task_should_done_date__month=month,
-                                            task_should_done_date__day=day)
+                day_tasks = tasks.filter(task_should_done_date__day=day)
                 week_data.append({
                     'day': day,
-                    'tasks': list(tasks.values('id', 'task_name', 'task_priority'))
+                    'tasks': list(day_tasks.values('id', 'task_name', 'task_priority'))
                 })
         calendar_data.append(week_data)
 
@@ -509,38 +553,42 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
 
     def perform_create(self, serializer):
-        user_id = self.request.data.get('user_id')
+        user = self.request.user
         project_id = self.request.data.get('project_id')
-        if not user_id or not project_id:
-            raise ValidationError("Параметры user_id и project_id обязательны")
-        serializer.save(
-            creator_id=user_id,
-            project_id=project_id
-        )
+
+        if not project_id:
+            raise ValidationError("Параметр project_id обязателен")
+
+        # Проверка: является ли пользователь админом проекта
+        is_admin = ProjectMember.objects.filter(
+            project_id=project_id,
+            user=user,
+            project_role='Администратор'
+        ).exists()
+
+        if not is_admin:
+            raise PermissionDenied("Только администратор может создавать задачи")
+
+        serializer.save(creator=user, project_id=project_id)
 
     def get_queryset(self):
         user = self.request.user
-        project_id = self.request.query_params.get('project_id')
+        # Получаем проекты, где пользователь участник
+        user_projects = ProjectMember.objects.filter(user=user).values_list('project', flat=True)
 
-        queryset = Task.objects.all()
+        # Для администратора проекта — все задачи проекта,
+        # Для исполнителя — только свои задачи
+        # Предполагаем, что в ProjectMember есть поле project_role
+        admin_projects = ProjectMember.objects.filter(user=user, project_role='Администратор').values_list('project',
+                                                                                                           flat=True)
 
-        if project_id:
-            queryset = queryset.filter(project_id=project_id)
-
-        if user.is_staff:
-            # Админ видит все задачи проекта
-            return queryset
+        # Возвращаем задачи:
+        # Если пользователь — администратор проекта, видит все задачи проекта
+        # Иначе — только свои задачи в проектах, где он участник
+        if admin_projects:
+            return Task.objects.filter(project__in=admin_projects)
         else:
-            # Участник видит только свои задачи (выполняет роль исполнителя)
-            return queryset.filter(task_implementer=user)
-
-    def perform_create(self, serializer):
-        project = serializer.save(creator=self.request.user)
-        ProjectMember.objects.create(
-            project=project,
-            user=self.request.user,
-            role='admin'
-        )
+            return Task.objects.filter(project__in=user_projects, task_implementer=user)
 
 
 # DRF API - список проектов
@@ -576,15 +624,34 @@ class TaskAPIView(APIView):
         return Response(serializer.data)
 
     def post(self, request, *args, **kwargs):
+        project_id = request.data.get('project_id')
+        if not project_id:
+            return Response({"error": "project_id обязателен"}, status=400)
+
+        is_admin = ProjectMember.objects.filter(
+            project_id=project_id,
+            user=request.user,
+            project_role='Администратор'
+        ).exists()
+
+        if not is_admin:
+            return Response({"error": "Только администратор может создавать задачи"}, status=403)
+
         serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(creator=request.user)  # <== вот здесь мы задаём creator
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save(creator=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
 
 class TaskDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def patch(self, request, pk):
-        task = Task.objects.get(pk=pk)
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return Response({'error': 'Задача не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = TaskSerializer(task, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -592,7 +659,11 @@ class TaskDetailAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk):
-        task = Task.objects.get(pk=pk)
+        try:
+            task = Task.objects.get(pk=pk)
+        except Task.DoesNotExist:
+            return Response({'error': 'Задача не найдена'}, status=status.HTTP_404_NOT_FOUND)
+
         task.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -791,3 +862,26 @@ def add_task(request):
             'task_mode': task.task_mode,
         }
     })
+
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from .models import ProjectMember
+
+@login_required
+def project_users(request):
+    project_id = request.GET.get('project_id')
+    if not project_id:
+        return JsonResponse({'error': 'project_id parameter is required'}, status=400)
+
+    # Проверка, что пользователь входит в проект (безопасность)
+    if not ProjectMember.objects.filter(project_id=project_id, user=request.user).exists():
+        return JsonResponse({'error': 'Access denied'}, status=403)
+
+    members = ProjectMember.objects.filter(project_id=project_id).select_related('user')
+    users_data = [{
+        'id': member.user.id,
+        'username': member.user.user_login,
+        'project_role': member.project_role,
+    } for member in members]
+
+    return JsonResponse(users_data, safe=False)

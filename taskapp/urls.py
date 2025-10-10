@@ -16,6 +16,7 @@ urlpatterns = [
 
     # Обычные представления
     path('', views.home, name='home'),
+    path('taskapp/api/project_users/', views.project_users, name='project_users'),
     path('taskapp/api/add_task/', views.add_task, name='add_task'),
     path('taskapp/api/add_task/<int:project_id>/', views.add_task, name='add_task_with_project'),
     path('taskapp/register/', views.register, name='register'),
@@ -27,7 +28,7 @@ urlpatterns = [
     path('taskapp/assign_task/<int:project_id>/', views.assign_task, name='assign_task'),
     path('taskapp/manage_project/', views.manage_project, name='manage_project'),
     path('taskapp/manage_project/<int:project_id>/', views.manage_project, name='manage_project_with_id'),
-    path('taskapp/team_work/<int:project_id>/', views.project_calendar_view, name='project_calendar_view'),
+    path('taskapp/project_calendar/<int:project_id>/', views.project_calendar_view, name='project_calendar_view'),
 
     # DRF ViewSet routes
     path('api/', include(router.urls)),
